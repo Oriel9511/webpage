@@ -111,6 +111,8 @@ const CustomCursor = () => {
   const [hovering, setHovering] = useState(false);
   const [pressed, setPressed] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
+  const visibleRef = useRef(false);
+  const hoveringRef = useRef(false);
 
   useEffect(() => {
     const fine = window.matchMedia('(pointer: fine)');
@@ -183,18 +185,19 @@ const CustomCursor = () => {
     const handleMove = (e) => {
       x.set(e.clientX);
       y.set(e.clientY);
-      setVisible(true);
       resetIdle();
       if (isTextInput(e.target)) {
-        setVisible(false);
+        if (visibleRef.current) { visibleRef.current = false; setVisible(false); }
       } else {
-        setHovering(isInteractive(e.target));
+        if (!visibleRef.current) { visibleRef.current = true; setVisible(true); }
+        const isHover = isInteractive(e.target);
+        if (hoveringRef.current !== isHover) { hoveringRef.current = isHover; setHovering(isHover); }
       }
     };
-    const handleLeave = () => setVisible(false);
+    const handleLeave = () => { if (visibleRef.current) { visibleRef.current = false; setVisible(false); } };
     const handleDown = () => setPressed(true);
     const handleUp = () => setPressed(false);
-    const handleEnter = () => setVisible(true);
+    const handleEnter = () => { if (!visibleRef.current) { visibleRef.current = true; setVisible(true); } };
 
     resetIdle();
 
@@ -432,7 +435,6 @@ const CustomCursor = () => {
               border: `${outlineWidth}px solid rgba(0,0,0,0.9)`,
               boxShadow: outlineShadow,
               opacity: ringOpacity,
-              willChange: 'transform, opacity',
             }}
             animate={{ scale: ringScale }}
             transition={{ type: 'spring', stiffness: 420, damping: 28 }}
@@ -448,7 +450,6 @@ const CustomCursor = () => {
                 width: BASE_RING,
                 height: BASE_RING,
                 opacity: baseOpacity,
-                willChange: 'transform, opacity',
               }}
               animate={{ scale: ringScale }}
               transition={{ type: 'spring', stiffness: 420, damping: 28 }}
@@ -469,7 +470,6 @@ const CustomCursor = () => {
                 opacity: baseOpacity,
                 backdropFilter: 'contrast(1.08) brightness(1.06) saturate(1.05) blur(0.5px)',
                 WebkitBackdropFilter: 'contrast(1.08) brightness(1.06) saturate(1.05) blur(0.5px)',
-                willChange: 'transform, opacity',
               }}
               animate={{ scale: ringScale }}
               transition={{ type: 'spring', stiffness: 420, damping: 28 }}
@@ -488,7 +488,6 @@ const CustomCursor = () => {
               border: `${ringBorder}px solid rgba(255,255,255,0.9)`,
               boxShadow: '0 0 24px rgba(255,255,255,0.06) inset',
               opacity: ringOpacity,
-              willChange: 'transform, opacity',
             }}
             animate={{ scale: ringScale }}
             transition={{ type: 'spring', stiffness: 420, damping: 28 }}
@@ -512,7 +511,6 @@ const CustomCursor = () => {
               border: hovering ? 'none' : `${dotOutlineWidth}px solid rgba(0,0,0,0.95)`,
               boxShadow: hovering ? 'none' : dotShadow,
               opacity: baseOpacity,
-              willChange: 'transform, opacity',
             }}
             animate={{ scale: dotScale, borderRadius: dotBorderRadius }}
             transition={{ type: 'spring', stiffness: 700, damping: 30 }}
@@ -542,7 +540,6 @@ const CustomCursor = () => {
               width: BASE_DOT,
               height: BASE_DOT,
               opacity: baseOpacity,
-              willChange: 'transform, opacity',
             }}
             animate={{ scale: dotScale, borderRadius: dotBorderRadius }}
             transition={{ type: 'spring', stiffness: 700, damping: 30 }}

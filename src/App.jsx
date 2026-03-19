@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowDown, Code2, Database, Layers } from 'lucide-react';
 import Navbar from './components/Navbar';
 import ExperienceRow from './components/ExperienceRow';
 import ProjectCard from './components/ProjectCard';
+import ProjectDetail from './components/ProjectDetail';
 import StackedSection from './components/StackedSection';
 import AnimatedQuote from './components/AnimatedQuote';
 import AnimatedName from './components/AnimatedName';
@@ -11,25 +12,27 @@ import SplashScreen from './components/SplashScreen';
 import CustomCursor from './components/CustomCursor';
 import { DATA } from './data/portfolioData';
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 function App() {
   const { scrollYProgress } = useScroll();
   const scaleX = useTransform(scrollYProgress, [0, 1], [0, 1]);
   const [showSplash, setShowSplash] = useState(true);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const closeProject = useCallback(() => setSelectedProject(null), []);
 
+  // Splash timer
   useEffect(() => {
-    // Slightly longer anticipation before revealing the site
     const t = setTimeout(() => setShowSplash(false), 2200);
-    // Lock scroll while splash is visible
-    if (showSplash) {
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      document.documentElement.style.overflow = '';
-    }
-    return () => {
-      clearTimeout(t);
-      document.documentElement.style.overflow = '';
-    };
-  }, [showSplash]);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Centralized scroll lock — one single owner
+  useEffect(() => {
+    document.documentElement.style.overflow =
+      (showSplash || selectedProject) ? 'hidden' : '';
+    return () => { document.documentElement.style.overflow = ''; };
+  }, [showSplash, selectedProject]);
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen w-full font-sans selection:bg-white selection:text-black">
@@ -37,6 +40,17 @@ function App() {
 
       {/* Splash Intro */}
       <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
+
+      {/* Project Detail Slide-Over */}
+      <AnimatePresence>
+        {selectedProject && (
+          <ProjectDetail
+            key={selectedProject.name}
+            project={selectedProject}
+            onClose={closeProject}
+          />
+        )}
+      </AnimatePresence>
 
       {!showSplash && (
         <main>
@@ -194,7 +208,12 @@ function App() {
 
             <div className="container mx-auto px-6 grid md:grid-cols-2 gap-6">
               {DATA.opensource.map((project, index) => (
-                <ProjectCard key={index} project={project} index={index} />
+                <ProjectCard
+                  key={index}
+                  project={project}
+                  index={index}
+                  onClick={() => setSelectedProject(project)}
+                />
               ))}
             </div>
           </StackedSection>
@@ -358,7 +377,7 @@ function App() {
                     </svg>
                   </motion.a>
                 </div>
-                <p className="px-6">© {new Date().getFullYear()} Oriel Arteaga.</p>
+                <p className="px-6">© {CURRENT_YEAR} Oriel Arteaga.</p>
               </footer>
             </div>
           </StackedSection>

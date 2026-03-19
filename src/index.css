@@ -33,3 +33,13 @@ body::-webkit-scrollbar,
     /* Keep I‑beam where it matters */
     input, textarea, select, [contenteditable="true"] { cursor: text; }
 }
+
+/* ── Reusable: hide scrollbar on any overflow container ── */
+.scroll-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.scroll-hidden::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+}
