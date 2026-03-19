@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: #0a0a0a;
+    color: white;
+}
+
+/* --- Global: Hide native scrollbars but keep scrolling --- */
+/* Firefox */
+html, body, #root {
+    scrollbar-width: none;
+    -ms-overflow-style: none; /* IE/Edge Legacy */
+}
+/* WebKit/Blink */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* --- Global: Custom cursor setup (hide OS cursor on precise pointers) --- */
+@media (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    body { cursor: none; }
+    /* Ensure no native hand cursor appears over interactive elements */
+    a, button, [role="button"], [data-cursor="hover"], .cursor-pointer, input[type="button"], input[type="submit"], summary, label { 
+        cursor: none !important; 
+    }
+    /* Keep I‑beam where it matters */
+    input, textarea, select, [contenteditable="true"] { cursor: text; }
+}
