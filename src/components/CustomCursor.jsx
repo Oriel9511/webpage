@@ -301,14 +301,14 @@ const CustomCursor = () => {
   const takeSnapshot = useCallback(async () => {
     if (!html2cRef.current) return;
     const now = Date.now();
-    if (now - lastSnapAtRef.current < 600) return;
+    if (now - lastSnapAtRef.current < 1500) return;
     lastSnapAtRef.current = now;
     try {
       const canvas = await html2cRef.current(document.body, {
         backgroundColor: null,
         useCORS: true,
         logging: false,
-        scale: 1,
+        scale: 0.5,
         windowWidth: document.documentElement.clientWidth,
         windowHeight: document.documentElement.clientHeight,
         scrollX: window.scrollX || 0,
@@ -331,7 +331,7 @@ const CustomCursor = () => {
     if (!enabled) return;
     const onScrollOrResize = () => {
       if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
-      snapTimerRef.current = setTimeout(() => takeSnapshot(), 350);
+      snapTimerRef.current = setTimeout(() => takeSnapshot(), 800);
     };
     const onVisibility = () => {
       if (document.visibilityState === 'visible') takeSnapshot();

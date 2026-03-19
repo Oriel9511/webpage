@@ -39,7 +39,7 @@ function App() {
       <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
 
       {!showSplash && (
-        <>
+        <main>
           <Navbar />
 
           {/* Progress Bar */}
@@ -133,7 +133,7 @@ function App() {
             </div>
 
             {/* Background Texture */}
-            <div className="absolute inset-0 bg-[url('https://framerusercontent.com/images/rR6HYXBrMmX4crpXDRXDY_0A.png')] opacity-10 mix-blend-overlay pointer-events-none"></div>
+            <div className="absolute inset-0 bg-[url('/textures/noise.png')] opacity-10 mix-blend-overlay pointer-events-none"></div>
           </StackedSection>
 
           {/* --- LAYER 2: QUOTE 1 (Light) --- */}
@@ -311,6 +311,8 @@ function App() {
                     whileHover="hover"
                     initial="initial"
                     href="https://linkedin.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="hover:text-white transition-colors px-6 py-4 relative"
                     data-cursor="hover"
                   >
@@ -334,6 +336,8 @@ function App() {
                     whileHover="hover"
                     initial="initial"
                     href="https://github.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="hover:text-white transition-colors px-6 py-4 relative"
                     data-cursor="hover"
                   >
@@ -359,7 +363,7 @@ function App() {
             </div>
           </StackedSection>
 
-        </>
+        </main>
       )}
     </div>
   );

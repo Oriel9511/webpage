@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 
@@ -8,34 +8,60 @@ const Navbar = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isVisible, setIsVisible] = useState(true);
     const lastScrollY = useRef(0);
+    const rafId = useRef(null);
 
-    useEffect(() => {
-        const handleScroll = () => {
+    // ── Navbar show/hide with rAF throttle ──────────────────────────────────
+    const handleScroll = useCallback(() => {
+        if (rafId.current) return;
+        rafId.current = requestAnimationFrame(() => {
             const currentScrollY = window.scrollY;
-
             if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
                 setIsVisible(false);
             } else {
                 setIsVisible(true);
             }
             lastScrollY.current = currentScrollY;
+            rafId.current = null;
+        });
+    }, []);
 
-            const sections = ['hero', 'quote1', 'work', 'quote2', 'opensource', 'about', 'contact'];
-            for (let i = sections.length - 1; i >= 0; i--) {
-                const section = sections[i];
-                const element = document.getElementById(section);
-                if (element) {
-                    const rect = element.getBoundingClientRect();
-                    if (rect.top <= window.innerHeight / 3) {
-                        setActiveSection(section);
-                        break;
+    useEffect(() => {
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            if (rafId.current) cancelAnimationFrame(rafId.current);
+        };
+    }, [handleScroll]);
+
+    // ── Section detection via IntersectionObserver ───────────────────────────
+    useEffect(() => {
+        const sections = ['hero', 'quote1', 'work', 'quote2', 'opensource', 'about', 'contact'];
+        const sectionElements = sections
+            .map((id) => document.getElementById(id))
+            .filter(Boolean);
+
+        if (sectionElements.length === 0) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                // Find the most visible section that's intersecting
+                let best = null;
+                for (const entry of entries) {
+                    if (entry.isIntersecting) {
+                        if (!best || entry.intersectionRatio > best.intersectionRatio) {
+                            best = entry;
+                        }
                     }
                 }
-            }
-        };
+                if (best) {
+                    setActiveSection(best.target.id);
+                }
+            },
+            { threshold: [0.1, 0.3, 0.5, 0.7], rootMargin: '-20% 0px -20% 0px' }
+        );
 
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        sectionElements.forEach((el) => observer.observe(el));
+        return () => observer.disconnect();
     }, []);
 
     const isDarkBg = ['hero', 'work', 'opensource', 'contact'].includes(activeSection);

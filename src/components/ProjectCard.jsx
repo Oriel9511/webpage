@@ -7,6 +7,7 @@ const ProjectCard = ({ project, index }) => {
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
             transition={{ delay: index * 0.1 }}
             className="p-6 border border-white/10 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
             data-cursor="hover"

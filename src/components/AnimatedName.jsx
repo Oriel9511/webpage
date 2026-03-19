@@ -23,7 +23,7 @@ const AnimatedName = ({ text, className = '' }) => {
   const words = (text || '').toUpperCase().split(/\s+/).filter(Boolean);
 
   return (
-    <div className={`w-full text-center ${className}`} aria-label={text} role="heading" aria-level={1}>
+    <h1 className={`w-full text-center ${className}`} aria-label={text}>
       <div className="inline-flex flex-col items-center leading-[0.8] [perspective:1200px]">
         {words.map((word, wi) => (
           <div key={`w-${wi}`} className="block">
@@ -54,7 +54,7 @@ const AnimatedName = ({ text, className = '' }) => {
           </div>
         ))}
       </div>
-    </div>
+    </h1>
   );
 };
 
