@@ -525,7 +525,7 @@ const CustomCursor = () => {
                   className="text-black"
                   style={{ filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))' }}
                 >
-                  <ArrowLeft size={10} strokeWidth={4} />
+                  <ArrowLeft size={6} strokeWidth={4} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -563,7 +563,7 @@ const CustomCursor = () => {
                   transition={{ duration: 0.18, ease: 'easeOut' }}
                   className="text-white relative z-10"
                 >
-                  <ArrowLeft size={10} strokeWidth={2.5} />
+                  <ArrowLeft size={6} strokeWidth={2.5} />
                 </motion.div>
               )}
             </AnimatePresence>

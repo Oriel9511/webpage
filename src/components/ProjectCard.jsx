@@ -26,10 +26,10 @@ const ProjectCard = ({ project, index, onClick }) => {
             <p className="text-zinc-300 text-sm font-light leading-relaxed">{project.desc}</p>
 
             {/* Hover hint */}
-            <div className="absolute bottom-4 right-4 flex items-center gap-1.5 text-zinc-600 group-hover:text-zinc-400 transition-colors text-xs font-mono uppercase tracking-widest">
+            {/* <div className="absolute bottom-4 right-4 flex items-center gap-1.5 text-zinc-600 group-hover:text-zinc-400 transition-colors text-xs font-mono uppercase tracking-widest">
                 <span>Ver detalle</span>
                 <ArrowRight size={11} />
-            </div>
+            </div> */}
         </motion.div>
     )
 }
