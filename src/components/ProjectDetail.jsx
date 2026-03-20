@@ -10,8 +10,10 @@ const slideVariants = {
     transition: {
       type: 'spring',
       stiffness: 60,
-      damping: 18,
+      damping: 22,
       mass: 1.1,
+      restDelta: 0.001,
+      restSpeed: 0.001,
     },
   },
   exit: {
@@ -19,8 +21,10 @@ const slideVariants = {
     transition: {
       type: 'spring',
       stiffness: 80,
-      damping: 22,
+      damping: 24,
       mass: 0.9,
+      restDelta: 0.001,
+      restSpeed: 0.001,
     },
   },
 };
