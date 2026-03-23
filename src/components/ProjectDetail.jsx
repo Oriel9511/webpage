@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { memo, useCallback, useEffect, useMemo } from 'react';
+import { motion as Motion } from 'framer-motion';
 import { ArrowLeft, Github, ExternalLink, X } from 'lucide-react';
 
 // ── Slide variants — enters from the right, exits to the right ────────────────
@@ -52,64 +52,34 @@ const HIGHLIGHTS = [
   'Cobertura de tests > 85%',
 ];
 
-// ── Component ─────────────────────────────────────────────────────────────────
-const ProjectDetail = ({ project, onClose }) => {
-  // Close on Escape
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+const CHALLENGE_CARDS = [
+  { title: 'El Desafío' },
+  { title: 'La Solución' },
+];
 
-  if (!project) return null;
+const PANEL_SHADOW = {
+  boxShadow: '-24px 0 80px rgba(0,0,0,0.55), -4px 0 16px rgba(0,0,0,0.35)',
+};
+
+const BACK_BUTTON_TRANSITION = { type: 'spring', stiffness: 300, damping: 20 };
+const CLOSE_BUTTON_TRANSITION = { type: 'spring', stiffness: 300, damping: 18 };
+
+const ProjectDetailBody = memo(function ProjectDetailBody({ project }) {
+  const stackItems = useMemo(
+    () => project.tech.split(/[,/]/).map((item) => item.trim()).filter(Boolean),
+    [project.tech],
+  );
 
   return (
-    <motion.div
-      variants={slideVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-        className="fixed inset-0 z-[150] bg-[#f0f0f0] text-black overflow-y-auto flex flex-col scroll-hidden"
-      style={{ boxShadow: '-24px 0 80px rgba(0,0,0,0.55), -4px 0 16px rgba(0,0,0,0.35)' }}
-      aria-modal="true"
-      role="dialog"
-      aria-label={`Detalle del proyecto: ${project.name}`}
-    >
-      {/* ── Top Bar ──────────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 left-0 right-0 z-10 flex items-center justify-between px-6 md:px-12 py-6 border-b border-black/10 bg-[#f0f0f0]/90 backdrop-blur-sm">
-        <motion.button
-          onClick={onClose}
-          className="flex items-center gap-3 text-zinc-500 hover:text-black transition-colors font-mono text-xs uppercase tracking-widest group"
-          data-cursor="hover"
-          whileHover={{ x: -4 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          aria-label="Volver a Labs"
-        >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Labs & Open Source
-        </motion.button>
-
-        <motion.button
-          onClick={onClose}
-          className="p-2 text-zinc-400 hover:text-black transition-colors"
-          data-cursor="hover"
-          whileHover={{ rotate: 90 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-          aria-label="Cerrar"
-        >
-          <X size={20} />
-        </motion.button>
-      </div>
-
-      {/* ── Main Content ──────────────────────────────────────────────────────── */}
+    <>
       <div className="flex-1 container mx-auto px-6 md:px-12 py-16 md:py-24 max-w-5xl">
 
         {/* Header */}
-        <motion.div custom={0} variants={itemVariants} initial="hidden" animate="visible" className="mb-4">
+        <Motion.div custom={0} variants={itemVariants} initial="hidden" animate="visible" className="mb-4">
           <span className="font-mono text-xs uppercase tracking-[0.25em] text-zinc-500">{project.tech}</span>
-        </motion.div>
+        </Motion.div>
 
-        <motion.h2
+        <Motion.h2
           custom={1}
           variants={itemVariants}
           initial="hidden"
@@ -117,7 +87,7 @@ const ProjectDetail = ({ project, onClose }) => {
           className="text-5xl md:text-7xl lg:text-8xl font-serif leading-none mb-16 tracking-tighter text-black"
         >
           {project.name}
-        </motion.h2>
+        </Motion.h2>
 
         <div className="h-px w-full bg-black/10 mb-16" />
 
@@ -125,25 +95,25 @@ const ProjectDetail = ({ project, onClose }) => {
         <div className="grid md:grid-cols-12 gap-12 mb-20">
 
           {/* Description */}
-          <motion.div custom={2} variants={itemVariants} initial="hidden" animate="visible" className="md:col-span-7 space-y-6">
+          <Motion.div custom={2} variants={itemVariants} initial="hidden" animate="visible" className="md:col-span-7 space-y-6">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-400 mb-6">Descripción</p>
             <p className="text-zinc-700 font-light text-lg leading-relaxed">{project.desc}</p>
             <p className="text-zinc-500 font-light leading-relaxed">{LOREM}</p>
-          </motion.div>
+          </Motion.div>
 
           {/* Sidebar */}
-          <motion.div custom={3} variants={itemVariants} initial="hidden" animate="visible" className="md:col-span-4 md:col-start-9 space-y-10">
+          <Motion.div custom={3} variants={itemVariants} initial="hidden" animate="visible" className="md:col-span-4 md:col-start-9 space-y-10">
 
             {/* Stack */}
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-400 mb-4">Stack</p>
               <div className="flex flex-wrap gap-2">
-                {project.tech.split(/[,/]/).map((t) => (
+                {stackItems.map((item) => (
                   <span
-                    key={t}
+                    key={item}
                     className="text-xs border border-black/10 bg-black/5 px-3 py-1.5 text-zinc-700 rounded-sm"
                   >
-                    {t.trim()}
+                    {item}
                   </span>
                 ))}
               </div>
@@ -153,36 +123,34 @@ const ProjectDetail = ({ project, onClose }) => {
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-400 mb-4">Aspectos clave</p>
               <ul className="space-y-3">
-                {HIGHLIGHTS.map((h, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-zinc-400 font-light">
+                {HIGHLIGHTS.map((highlight) => (
+                  <li key={highlight} className="flex items-start gap-3 text-sm text-zinc-400 font-light">
                     <span className="mt-1.5 h-px w-4 shrink-0 bg-zinc-400" />
-                    {h}
+                    {highlight}
                   </li>
                 ))}
               </ul>
             </div>
-          </motion.div>
+          </Motion.div>
         </div>
 
         {/* Lorem section 2 */}
-        <motion.div custom={4} variants={itemVariants} initial="hidden" animate="visible" className="border-t border-black/10 pt-16 mb-20">
+        <Motion.div custom={4} variants={itemVariants} initial="hidden" animate="visible" className="border-t border-black/10 pt-16 mb-20">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-400 mb-8">Desafíos & Soluciones</p>
           <div className="grid md:grid-cols-2 gap-8">
-            {[0, 1].map((i) => (
-              <div key={i} className="border border-black/10 p-8 bg-black/3">
-                <h3 className="font-serif text-2xl mb-4 text-black">
-                  {i === 0 ? 'El Desafío' : 'La Solución'}
-                </h3>
+            {CHALLENGE_CARDS.map((card) => (
+              <div key={card.title} className="border border-black/10 p-8 bg-black/3">
+                <h3 className="font-serif text-2xl mb-4 text-black">{card.title}</h3>
                 <p className="text-zinc-500 font-light leading-relaxed text-sm">
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
                 </p>
               </div>
             ))}
           </div>
-        </motion.div>
+        </Motion.div>
 
         {/* CTA Links */}
-        <motion.div custom={5} variants={itemVariants} initial="hidden" animate="visible" className="flex flex-wrap gap-6">
+        <Motion.div custom={5} variants={itemVariants} initial="hidden" animate="visible" className="flex flex-wrap gap-6">
           <a
             href="#"
             className="group inline-flex items-center gap-3 border border-black/20 px-6 py-4 text-sm font-mono uppercase tracking-widest hover:bg-black hover:text-white transition-all duration-300"
@@ -201,7 +169,7 @@ const ProjectDetail = ({ project, onClose }) => {
             Demo en Vivo
             <ArrowLeft size={14} className="rotate-180 group-hover:translate-x-1 transition-transform" />
           </a>
-        </motion.div>
+        </Motion.div>
       </div>
 
       {/* ── Footer stripe ─────────────────────────────────────────────────────── */}
@@ -209,8 +177,62 @@ const ProjectDetail = ({ project, onClose }) => {
         <span>{project.name}</span>
         <span>{project.tech}</span>
       </div>
-    </motion.div>
+    </>
+  );
+});
+
+// ── Component ─────────────────────────────────────────────────────────────────
+const ProjectDetail = ({ project, onClose }) => {
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!project) return null;
+
+  return (
+    <Motion.div
+      variants={slideVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+        className="fixed inset-0 z-[150] bg-[#f0f0f0] text-black overflow-y-auto flex flex-col scroll-hidden"
+      style={PANEL_SHADOW}
+      aria-modal="true"
+      role="dialog"
+      aria-label={`Detalle del proyecto: ${project.name}`}
+    >
+      {/* ── Top Bar ──────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 left-0 right-0 z-10 flex items-center justify-between px-6 md:px-12 py-6 border-b border-black/10 bg-[#f0f0f0]/90 backdrop-blur-sm">
+        <Motion.button
+          onClick={onClose}
+          className="flex items-center gap-3 text-zinc-500 hover:text-black transition-colors font-mono text-xs uppercase tracking-widest group"
+          data-cursor="hover"
+          whileHover={{ x: -4 }}
+          transition={BACK_BUTTON_TRANSITION}
+          aria-label="Volver a Labs"
+        >
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          Labs & Open Source
+        </Motion.button>
+
+        <Motion.button
+          onClick={onClose}
+          className="p-2 text-zinc-400 hover:text-black transition-colors"
+          data-cursor="hover"
+          whileHover={{ rotate: 90 }}
+          transition={CLOSE_BUTTON_TRANSITION}
+          aria-label="Cerrar"
+        >
+          <X size={20} />
+        </Motion.button>
+      </div>
+
+      <ProjectDetailBody project={project} />
+    </Motion.div>
   );
 };
 
-export default ProjectDetail;
+export default memo(ProjectDetail);

@@ -1,14 +1,13 @@
-import React from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import React, { memo, useMemo } from 'react';
+import { motion as Motion, useReducedMotion } from 'framer-motion';
 
 const letterVariants = {
-  hidden: { opacity: 0, y: 28, rotateX: 35, scale: 0.96, filter: 'blur(8px)' },
+  hidden: { opacity: 0, y: 28, rotateX: 35, scale: 0.96 },
   visible: (i) => ({
     opacity: 1,
     y: 0,
     rotateX: 0,
     scale: 1,
-    filter: 'blur(0px)',
     transition: {
       duration: 0.7,
       delay: i * 0.045,
@@ -17,40 +16,62 @@ const letterVariants = {
   }),
 };
 
+const hoverTransition = { type: 'tween', duration: 0.2 };
+
 const AnimatedName = ({ text, className = '' }) => {
   const shouldReduceMotion = useReducedMotion();
+  const rows = useMemo(() => {
+    const words = (text || '').toUpperCase().split(/\s+/).filter(Boolean);
 
-  const words = (text || '').toUpperCase().split(/\s+/).filter(Boolean);
+    return words.reduce(
+      ({ items, offset }, word, wordIndex) => ({
+        items: [
+          ...items,
+          {
+            key: `w-${wordIndex}`,
+            letters: Array.from(word, (character, letterIndex) => {
+              const index = offset + letterIndex;
+
+              return {
+                character,
+                key: `c-${index}`,
+                index,
+              };
+            }),
+          },
+        ],
+        offset: offset + word.length,
+      }),
+      { items: [], offset: 0 },
+    ).items;
+  }, [text]);
 
   return (
     <h1 className={`w-full text-center ${className}`} aria-label={text}>
       <div className="inline-flex flex-col items-center leading-[0.8] [perspective:1200px]">
-        {words.map((word, wi) => (
-          <div key={`w-${wi}`} className="block">
-            {word.split('').map((ch, ci) => {
-              // Stagger index based on total letters before this one (prevents huge inter-word delay)
-              const lettersBefore = words.slice(0, wi).reduce((sum, w) => sum + w.length, 0);
-              const idx = lettersBefore + ci;
+        {rows.map((row, rowIndex) => (
+          <div key={row.key} className="block">
+            {row.letters.map(({ character, key, index }) => {
               return shouldReduceMotion ? (
-                <span key={`c-${idx}`} className="inline-block">
-                  {ch}
+                <span key={key} className="inline-block">
+                  {character}
                 </span>
               ) : (
-                <motion.span
-                  key={`c-${idx}`}
-                  custom={idx}
+                <Motion.span
+                  key={key}
+                  custom={index}
                   initial="hidden"
                   animate="visible"
                   variants={letterVariants}
                   whileHover={{ y: -2, scale: 1.02 }}
-                  transition={{ type: 'tween', duration: 0.2 }}
+                  transition={hoverTransition}
                   className="inline-block will-change-transform [text-shadow:0_0_0_rgba(255,255,255,0)] hover:[text-shadow:0_6px_24px_rgba(255,255,255,0.08)]"
                 >
-                  {ch}
-                </motion.span>
+                  {character}
+                </Motion.span>
               );
             })}
-            {wi < words.length - 1 && <br />}
+            {rowIndex < rows.length - 1 && <br />}
           </div>
         ))}
       </div>
@@ -58,4 +79,4 @@ const AnimatedName = ({ text, className = '' }) => {
   );
 };
 
-export default AnimatedName;
+export default memo(AnimatedName);

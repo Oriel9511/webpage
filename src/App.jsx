@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion as Motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowDown, Code2, Database, Layers } from 'lucide-react';
 import Navbar from './components/Navbar';
 import ExperienceRow from './components/ExperienceRow';
@@ -19,7 +19,17 @@ function App() {
   const scaleX = useTransform(scrollYProgress, [0, 1], [0, 1]);
   const [showSplash, setShowSplash] = useState(true);
   const [selectedProject, setSelectedProject] = useState(null);
+  const openProject = useCallback((project) => setSelectedProject(project), []);
   const closeProject = useCallback(() => setSelectedProject(null), []);
+  const projectCards = useMemo(
+    () => DATA.opensource.map((project, index) => ({
+      key: project.name,
+      project,
+      index,
+      onClick: () => openProject(project),
+    })),
+    [openProject],
+  );
 
   // Splash timer
   useEffect(() => {
@@ -57,7 +67,7 @@ function App() {
           <Navbar />
 
           {/* Progress Bar */}
-          <motion.div
+          <Motion.div
             className="progress-bar fixed top-0 left-0 right-0 h-1 bg-white origin-left z-[100] mix-blend-difference"
             style={{ scaleX }}
           />
@@ -67,7 +77,7 @@ function App() {
             <div className="container mx-auto h-full flex flex-col justify-between relative z-10">
 
               {/* TOP: Location & Meta */}
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 1, delay: 0.2 }}
@@ -82,7 +92,7 @@ function App() {
                   <span className="text-zinc-500 font-mono text-xs uppercase tracking-widest mb-1">Rol</span>
                   <span className="text-white font-serif text-lg tracking-wide">{DATA.profile.role}</span>
                 </div>
-              </motion.div>
+              </Motion.div>
 
               {/* MIDDLE: Name */}
               <div className="flex-grow flex items-center justify-center my-8 md:my-0">
@@ -96,7 +106,7 @@ function App() {
               <div className="grid md:grid-cols-12 gap-8 items-end border-b border-white/10 pb-6">
 
                 {/* Left: Scroll Indicator */}
-                <motion.div
+                <Motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.2, duration: 1 }}
@@ -107,10 +117,10 @@ function App() {
                     <span>Scroll</span>
                     <ArrowDown size={14} className="animate-bounce" />
                   </div>
-                </motion.div>
+                </Motion.div>
 
                 {/* Center: Tagline (The Anchor) */}
-                <motion.div
+                <Motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1, duration: 1 }}
@@ -120,7 +130,7 @@ function App() {
                     De la programación de hardware al desarrollo Full Stack.<br className="hidden md:block" />
                     <span className="text-zinc-200">Una visión sistémica para arquitecturas web complejas.</span>
                   </p>
-                </motion.div>
+                </Motion.div>
 
                 {/* Right: Availability */}
                 {/* <motion.div
@@ -161,7 +171,7 @@ function App() {
           {/* --- LAYER 3: WORK (Dark) --- */}
           <StackedSection id="work" zIndex={20} theme="dark" sticky={true} className="justify-start py-24 md:py-32">
             <div className="container mx-auto px-6 mb-16">
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, x: -50 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 transition={{ duration: 1 }}
@@ -169,7 +179,7 @@ function App() {
               >
                 <h2 className="text-5xl md:text-7xl font-serif mb-6">Trayectoria.</h2>
                 <div className="h-1 w-24 bg-white/30"></div>
-              </motion.div>
+              </Motion.div>
             </div>
 
             <div className="w-full">
@@ -192,7 +202,7 @@ function App() {
           {/* --- LAYER 5: OPEN SOURCE / PROJECTS (Dark) --- */}
           <StackedSection id="opensource" zIndex={40} theme="dark" sticky={true} className="justify-start py-24 md:py-32">
             <div className="container mx-auto px-6 mb-16">
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, x: -50 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 transition={{ duration: 1 }}
@@ -203,16 +213,14 @@ function App() {
                   Proyectos paralelos, herramientas experimentales y contribuciones que mantienen mis habilidades afiladas.
                 </p>
                 <div className="h-1 w-24 bg-white/30 mt-6"></div>
-              </motion.div>
+              </Motion.div>
             </div>
 
             <div className="container mx-auto px-6 grid md:grid-cols-2 gap-6">
-              {DATA.opensource.map((project, index) => (
+              {projectCards.map(({ key, ...cardProps }) => (
                 <ProjectCard
-                  key={index}
-                  project={project}
-                  index={index}
-                  onClick={() => setSelectedProject(project)}
+                  key={key}
+                  {...cardProps}
                 />
               ))}
             </div>
@@ -326,7 +334,7 @@ function App() {
 
               <footer className="mt-32 flex flex-row justify-between items-center text-zinc-500 text-xs font-mono uppercase tracking-widest border-t border-white/10 pt-4 pb-12">
                 <div className="flex">
-                  <motion.a
+                  <Motion.a
                     whileHover="hover"
                     initial="initial"
                     href="https://linkedin.com"
@@ -337,21 +345,21 @@ function App() {
                   >
                     LinkedIn
                     <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-                      <motion.polyline
+                      <Motion.polyline
                         points="1,1 99,1 99,99"
                         fill="none" stroke="currentColor" strokeWidth="1"
                         variants={{ hover: { pathLength: 1 }, initial: { pathLength: 0 } }}
                         transition={{ duration: 0.4, ease: "easeInOut" }}
                       />
-                      <motion.polyline
+                      <Motion.polyline
                         points="1,1 1,99 99,99"
                         fill="none" stroke="currentColor" strokeWidth="1"
                         variants={{ hover: { pathLength: 1 }, initial: { pathLength: 0 } }}
                         transition={{ duration: 0.4, ease: "easeInOut" }}
                       />
                     </svg>
-                  </motion.a>
-                  <motion.a
+                  </Motion.a>
+                  <Motion.a
                     whileHover="hover"
                     initial="initial"
                     href="https://github.com"
@@ -362,20 +370,20 @@ function App() {
                   >
                     GitHub
                     <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-                      <motion.polyline
+                      <Motion.polyline
                         points="1,1 99,1 99,99"
                         fill="none" stroke="currentColor" strokeWidth="1"
                         variants={{ hover: { pathLength: 1 }, initial: { pathLength: 0 } }}
                         transition={{ duration: 0.4, ease: "easeInOut" }}
                       />
-                      <motion.polyline
+                      <Motion.polyline
                         points="1,1 1,99 99,99"
                         fill="none" stroke="currentColor" strokeWidth="1"
                         variants={{ hover: { pathLength: 1 }, initial: { pathLength: 0 } }}
                         transition={{ duration: 0.4, ease: "easeInOut" }}
                       />
                     </svg>
-                  </motion.a>
+                  </Motion.a>
                 </div>
                 <p className="px-6">© {CURRENT_YEAR} Oriel Arteaga.</p>
               </footer>

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   animate,
-  motion,
+  motion as Motion,
   useMotionValue,
   useReducedMotion,
   useSpring,
@@ -52,23 +52,28 @@ async function animLookAround(pupilX, pupilY) {
     [-maxR * 0.6, maxR * 0.4],
   ];
 
-  while (moves.length > 0) {
-    const position = moves[Math.floor(Math.random() * moves.length)];
-    const [tx, ty] = position;
+  // Fisher-Yates shuffle — visit every position exactly once
+  for (let i = moves.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [moves[i], moves[j]] = [moves[j], moves[i]];
+  }
+
+  for (const [tx, ty] of moves) {
+    const dur = Math.floor((Math.random() + 0.4) * 10) / 10;
     await Promise.all([
-      animate(pupilX, -tx, { duration: Math.floor(Math.random() + 0.4 * 10) / 10, ease: 'easeInOut' }),
-      animate(pupilY, -ty, { duration: Math.floor(Math.random() + 0.4 * 10) / 10, ease: 'easeInOut' }),
+      animate(pupilX, -tx, { duration: dur, ease: 'easeInOut' }),
+      animate(pupilY, -ty, { duration: dur, ease: 'easeInOut' }),
     ]);
-    moves.shift();
     await sleep(230);
   }
+
   await Promise.all([
     animate(pupilX, 0, { duration: 0.40, ease: 'easeOut' }),
     animate(pupilY, 0, { duration: 0.40, ease: 'easeOut' }),
   ]);
 }
 
-async function animPulse(_, __, ___, idleDotScale) {
+async function _animPulse(_, __, ___, idleDotScale) {
   await animate(idleDotScale, 1.55, { duration: 0.46, ease: 'easeInOut' });
   await animate(idleDotScale, 0.7, { duration: 0.42, ease: 'easeInOut' });
   await animate(idleDotScale, 1.3, { duration: 0.38, ease: 'easeInOut' });
@@ -103,6 +108,8 @@ const IDLE_SEQUENCES = [
   animBlink,
 ];
 
+const IDLE_DELAY_MS = 2500;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 const CustomCursor = () => {
   const reduce = useReducedMotion();
@@ -113,6 +120,8 @@ const CustomCursor = () => {
   const [isIdle, setIsIdle] = useState(false);
   const visibleRef = useRef(false);
   const hoveringRef = useRef(false);
+  const latestPointerRef = useRef({ x: -100, y: -100, active: false });
+  const moveFrameRef = useRef(null);
 
   useEffect(() => {
     const fine = window.matchMedia('(pointer: fine)');
@@ -152,7 +161,6 @@ const CustomCursor = () => {
   const idleDotScale = useMotionValue(1); // pupil size pulse
 
   // Combined dot position = spring position + pupil wander offset
-  // useTransform with a function reactively reads pupilX, pupilY, dotX, dotY
   const finalDotX = useTransform(() => dotX.get() + pupilX.get());
   const finalDotY = useTransform(() => dotY.get() + pupilY.get());
 
@@ -160,6 +168,7 @@ const CustomCursor = () => {
   const idleTimerRef = useRef(null);
   const isIdleRef = useRef(false);
   const isRunningRef = useRef(false);
+  const lastInteractionAtRef = useRef(0);
 
   // ── Shuffle bag: random order, no repeats until all have played ──────────
   const shuffleBagRef = useRef([]);
@@ -177,8 +186,38 @@ const CustomCursor = () => {
     return IDLE_SEQUENCES[shuffleBagRef.current.shift()];
   }, []);
 
-  const resetIdle = useCallback(() => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+  const setCursorVisible = useCallback((nextVisible) => {
+    if (visibleRef.current !== nextVisible) {
+      visibleRef.current = nextVisible;
+      setVisible(nextVisible);
+    }
+  }, []);
+
+  const setCursorHovering = useCallback((nextHovering) => {
+    if (hoveringRef.current !== nextHovering) {
+      hoveringRef.current = nextHovering;
+      setHovering(nextHovering);
+    }
+  }, []);
+
+  const scheduleIdleCheck = useCallback((delay = IDLE_DELAY_MS) => {
+    if (idleTimerRef.current) return;
+    idleTimerRef.current = window.setTimeout(() => {
+      idleTimerRef.current = null;
+      const remaining = IDLE_DELAY_MS - (Date.now() - lastInteractionAtRef.current);
+      if (remaining <= 0) {
+        if (!isIdleRef.current) {
+          isIdleRef.current = true;
+          setIsIdle(true);
+        }
+        return;
+      }
+      scheduleIdleCheck(remaining);
+    }, Math.max(delay, 0));
+  }, []);
+
+  const noteActivity = useCallback(() => {
+    lastInteractionAtRef.current = Date.now();
     if (isIdleRef.current) {
       isIdleRef.current = false;
       setIsIdle(false);
@@ -188,50 +227,113 @@ const CustomCursor = () => {
       animate(idleScaleY, 1, { duration: 0.12, ease: 'easeOut' });
       animate(idleDotScale, 1, { duration: 0.12, ease: 'easeOut' });
     }
-    idleTimerRef.current = setTimeout(() => {
-      isIdleRef.current = true;
-      setIsIdle(true);
-    }, 2500);
-  }, [pupilX, pupilY, idleScaleY, idleDotScale]);
+    scheduleIdleCheck();
+  }, [pupilX, pupilY, idleScaleY, idleDotScale, scheduleIdleCheck]);
+
+  const syncTargetState = useCallback((target) => {
+    const inTextInput = isTextInput(target);
+    if (inTextInput) {
+      setCursorHovering(false);
+      setCursorVisible(false);
+      return;
+    }
+
+    setCursorVisible(true);
+    setCursorHovering(isInteractive(target));
+  }, [setCursorHovering, setCursorVisible]);
+
+  const refreshTargetFromPointer = useCallback(() => {
+    const pointer = latestPointerRef.current;
+    if (!pointer.active) return;
+    const target = document.elementFromPoint(pointer.x, pointer.y);
+    if (target) syncTargetState(target);
+  }, [syncTargetState]);
 
   // ── Mouse event listeners ─────────────────────────────────────────────────
   useEffect(() => {
     if (!enabled) return;
 
+    const flushMove = () => {
+      moveFrameRef.current = null;
+      const pointer = latestPointerRef.current;
+      x.set(pointer.x);
+      y.set(pointer.y);
+      // Evaluate hover state from pointermove target (replaces noisy pointerover)
+      const target = document.elementFromPoint(pointer.x, pointer.y);
+      if (target) syncTargetState(target);
+      noteActivity();
+    };
+
     const handleMove = (e) => {
-      x.set(e.clientX);
-      y.set(e.clientY);
-      resetIdle();
-      if (isTextInput(e.target)) {
-        if (visibleRef.current) { visibleRef.current = false; setVisible(false); }
-      } else {
-        if (!visibleRef.current) { visibleRef.current = true; setVisible(true); }
-        const isHover = isInteractive(e.target);
-        if (hoveringRef.current !== isHover) { hoveringRef.current = isHover; setHovering(isHover); }
+      latestPointerRef.current = { x: e.clientX, y: e.clientY, active: true };
+      if (moveFrameRef.current === null) {
+        moveFrameRef.current = requestAnimationFrame(flushMove);
       }
     };
-    const handleLeave = () => { if (visibleRef.current) { visibleRef.current = false; setVisible(false); } };
-    const handleDown = () => setPressed(true);
-    const handleUp = () => setPressed(false);
-    const handleEnter = () => { if (!visibleRef.current) { visibleRef.current = true; setVisible(true); } };
 
-    resetIdle();
+    const handleFocusIn = (e) => {
+      syncTargetState(e.target);
+    };
 
-    window.addEventListener('mousemove', handleMove, { passive: true });
-    window.addEventListener('mousedown', handleDown, { passive: true });
-    window.addEventListener('mouseup', handleUp, { passive: true });
+    const handleLeave = () => {
+      latestPointerRef.current.active = false;
+      setCursorVisible(false);
+      setCursorHovering(false);
+    };
+
+    const handleEnter = (e) => {
+      latestPointerRef.current = { x: e.clientX, y: e.clientY, active: true };
+      refreshTargetFromPointer();
+    };
+
+    const handleDown = (e) => {
+      syncTargetState(e.target);
+      setPressed(true);
+      noteActivity();
+    };
+
+    const handleUp = (e) => {
+      syncTargetState(e.target);
+      setPressed(false);
+      noteActivity();
+    };
+
+    noteActivity();
+
+    window.addEventListener('pointermove', handleMove, { passive: true });
+    window.addEventListener('pointerdown', handleDown, { passive: true });
+    window.addEventListener('pointerup', handleUp, { passive: true });
     window.addEventListener('mouseleave', handleLeave, { passive: true });
     window.addEventListener('mouseenter', handleEnter, { passive: true });
+    document.addEventListener('focusin', handleFocusIn);
 
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mousedown', handleDown);
-      window.removeEventListener('mouseup', handleUp);
+      if (moveFrameRef.current !== null) cancelAnimationFrame(moveFrameRef.current);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerdown', handleDown);
+      window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('mouseleave', handleLeave);
       window.removeEventListener('mouseenter', handleEnter);
+      document.removeEventListener('focusin', handleFocusIn);
     };
-  }, [enabled, x, y, resetIdle]);
+  }, [enabled, x, y, noteActivity, refreshTargetFromPointer, setCursorHovering, setCursorVisible, syncTargetState]);
+
+  // ── Scroll / resize — refresh hover state (no snapshot scheduling) ──────
+  useEffect(() => {
+    if (!enabled) return;
+
+    const onScroll = () => refreshTargetFromPointer();
+    const onResize = () => refreshTargetFromPointer();
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [enabled, refreshTargetFromPointer]);
 
   // ── Idle animation loop (shuffle bag — no repeats within a cycle) ─────────
   useEffect(() => {
@@ -247,7 +349,9 @@ const CustomCursor = () => {
         const seq = nextFromBag();
         try {
           await seq(pupilX, pupilY, idleScaleY, idleDotScale);
-        } catch (_) { /* animation was cancelled */ }
+        } catch {
+          return;
+        }
         await sleep(900 + Math.random() * 1800);
       }
 
@@ -280,124 +384,6 @@ const CustomCursor = () => {
   const ringOpacity = hovering ? 0 : (visible ? 1 : 0);
   const dotBorderRadius = hovering ? '14px' : '50%';
 
-  // ── Lens / html2canvas ────────────────────────────────────────────────────
-  const lensScale = 1.5;
-  const html2cRef = useRef(null);
-  const snapshotCanvasRef = useRef(null);
-  const lensMountRef = useRef(null);
-  const snapTimerRef = useRef(null);
-  const lastSnapAtRef = useRef(0);
-  const [snapRev, setSnapRev] = useState(0);
-  const [vp, setVp] = useState({
-    w: typeof window !== 'undefined' ? window.innerWidth : 0,
-    h: typeof window !== 'undefined' ? window.innerHeight : 0,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!enabled) return undefined;
-    (async () => {
-      try {
-        const mod = await import('html2canvas');
-        if (!cancelled) {
-          html2cRef.current = mod.default || mod;
-          takeSnapshot();
-          setTimeout(() => takeSnapshot(), 1200);
-        }
-      } catch (_) { }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener('resize', onResize, { passive: true });
-    return () => window.removeEventListener('resize', onResize);
-  }, [enabled]);
-
-  const takeSnapshot = useCallback(async () => {
-    if (!html2cRef.current) return;
-    const now = Date.now();
-    if (now - lastSnapAtRef.current < 1500) return;
-    lastSnapAtRef.current = now;
-    try {
-      const canvas = await html2cRef.current(document.body, {
-        backgroundColor: null,
-        useCORS: true,
-        logging: false,
-        scale: 0.5,
-        windowWidth: document.documentElement.clientWidth,
-        windowHeight: document.documentElement.clientHeight,
-        scrollX: window.scrollX || 0,
-        scrollY: window.scrollY || 0,
-        ignoreElements: (el) => {
-          try {
-            return (
-              el?.classList?.contains('custom-cursor-root') ||
-              el?.getAttribute?.('data-html2canvas-ignore') === 'true'
-            );
-          } catch (_) { return false; }
-        },
-      });
-      snapshotCanvasRef.current = canvas;
-      setSnapRev((v) => v + 1);
-    } catch (_) { }
-  }, []);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const onScrollOrResize = () => {
-      if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
-      snapTimerRef.current = setTimeout(() => takeSnapshot(), 800);
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') takeSnapshot();
-    };
-    window.addEventListener('scroll', onScrollOrResize, { passive: true });
-    window.addEventListener('resize', onScrollOrResize, { passive: true });
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('scroll', onScrollOrResize);
-      window.removeEventListener('resize', onScrollOrResize);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [enabled, takeSnapshot]);
-
-  useEffect(() => {
-    const mount = lensMountRef.current;
-    const canvas = snapshotCanvasRef.current;
-    if (!mount || !canvas) return;
-    if (canvas.parentElement !== mount) {
-      mount.innerHTML = '';
-      mount.appendChild(canvas);
-    }
-    Object.assign(canvas.style, {
-      position: 'absolute',
-      left: '0px',
-      top: '0px',
-      width: `${vp.w * lensScale}px`,
-      height: `${vp.h * lensScale}px`,
-      transformOrigin: '0 0',
-      willChange: 'transform',
-    });
-  }, [snapRev, vp.w, vp.h, lensScale]);
-
-  // Direct DOM update for lens offset — no React renders
-  useEffect(() => {
-    const updateOffset = () => {
-      const canvas = snapshotCanvasRef.current;
-      if (!canvas) return;
-      const offsetX = -(ringX.get() * lensScale - BASE_RING / 2);
-      const offsetY = -(ringY.get() * lensScale - BASE_RING / 2);
-      canvas.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-    };
-    const unsubX = ringX.on('change', updateOffset);
-    const unsubY = ringY.on('change', updateOffset);
-    return () => { unsubX(); unsubY(); };
-  }, [ringX, ringY, lensScale, snapRev]);
-
   if (!enabled) return null;
 
   const baseOpacity = visible ? 1 : 0;
@@ -406,10 +392,7 @@ const CustomCursor = () => {
     ? '0 12px 28px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)'
     : '0 3px 8px rgba(0,0,0,0.5)';
 
-  // ── Shared style object for the blink wrapper centred at ring position ────
-  // All ring (eye) elements live inside a zero-size wrapper that carries the
-  // ring's spring position + the idle scaleY (blink). This avoids any conflict
-  // between style MotionValues and animate static values on the same element.
+  // ── Shared style objects for wrapper divs ─────────────────────────────────
   const eyeWrapperStyle = {
     x: ringX,
     y: ringY,
@@ -418,7 +401,6 @@ const CustomCursor = () => {
     scaleY: idleScaleY, // blink — MotionValue in style, no conflict
   };
 
-  // Same for dot: the wrapper carries position + blink, children carry scale
   const dotWrapperStyle = {
     x: finalDotX,  // combined spring + pupil offset
     y: finalDotY,
@@ -436,11 +418,10 @@ const CustomCursor = () => {
       {/* ── Eye (ring) wrapper — positions ring elements, applies blink ─── */}
       <div className="absolute" style={{ left: 0, top: 0 }}>
 
-        {/* We need the wrapper itself to be a motion.div for the MotionValue */}
-        <motion.div className="absolute" style={eyeWrapperStyle}>
+        <Motion.div className="absolute" style={eyeWrapperStyle}>
 
           {/* Outline ring — black shadow */}
-          <motion.div
+          <Motion.div
             aria-hidden
             className="absolute"
             style={{
@@ -456,44 +437,25 @@ const CustomCursor = () => {
             transition={{ type: 'spring', stiffness: 420, damping: 28 }}
           />
 
-          {/* Lens — canvas snapshot */}
-          {snapshotCanvasRef.current && (
-            <motion.div
-              aria-hidden
-              className="absolute rounded-full overflow-hidden"
-              style={{
-                ...childCenter,
-                width: BASE_RING,
-                height: BASE_RING,
-                opacity: baseOpacity,
-              }}
-              animate={{ scale: ringScale }}
-              transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-            >
-              <div ref={lensMountRef} className="absolute inset-0" />
-            </motion.div>
-          )}
-
-          {/* Fallback backdrop lens */}
-          {!snapshotCanvasRef.current && (
-            <motion.div
-              aria-hidden
-              className="absolute rounded-full overflow-hidden"
-              style={{
-                ...childCenter,
-                width: BASE_RING,
-                height: BASE_RING,
-                opacity: baseOpacity,
-                backdropFilter: 'contrast(1.08) brightness(1.06) saturate(1.05) blur(0.5px)',
-                WebkitBackdropFilter: 'contrast(1.08) brightness(1.06) saturate(1.05) blur(0.5px)',
-              }}
-              animate={{ scale: ringScale }}
-              transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-            />
-          )}
+          {/* GPU-composited lens — pure backdrop-filter, no html2canvas */}
+          <Motion.div
+            aria-hidden
+            className="absolute rounded-full overflow-hidden"
+            style={{
+              ...childCenter,
+              width: BASE_RING,
+              height: BASE_RING,
+              opacity: baseOpacity,
+              backdropFilter: 'contrast(1.08) brightness(1.06) saturate(1.05) blur(0.5px)',
+              WebkitBackdropFilter: 'contrast(1.08) brightness(1.06) saturate(1.05) blur(0.5px)',
+              willChange: 'transform',
+            }}
+            animate={{ scale: ringScale }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+          />
 
           {/* Ring — mix-blend-difference white ring */}
-          <motion.div
+          <Motion.div
             aria-hidden
             className="absolute mix-blend-difference"
             style={{
@@ -509,15 +471,15 @@ const CustomCursor = () => {
             transition={{ type: 'spring', stiffness: 420, damping: 28 }}
           />
 
-        </motion.div>
+        </Motion.div>
       </div>
 
       {/* ── Pupil (dot) wrapper — wanders inside ring, also blinks ──────── */}
       <div className="absolute" style={{ left: 0, top: 0 }}>
-        <motion.div className="absolute" style={dotWrapperStyle}>
+        <Motion.div className="absolute" style={dotWrapperStyle}>
 
           {/* Dot Outline — black edge */}
-          <motion.div
+          <Motion.div
             aria-hidden
             className="absolute flex items-center justify-center overflow-visible"
             style={{
@@ -533,7 +495,7 @@ const CustomCursor = () => {
           >
             <AnimatePresence>
               {hovering && (
-                <motion.div
+                <Motion.div
                   initial={{ opacity: 0, scale: 0.5, x: 10, rotate: 0 }}
                   animate={{ opacity: 1, scale: 1, x: 0, rotate: 35 }}
                   exit={{ opacity: 0, scale: 0.5, x: -10, rotate: 0 }}
@@ -542,13 +504,13 @@ const CustomCursor = () => {
                   style={{ filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))' }}
                 >
                   <ArrowLeft size={6} strokeWidth={4} />
-                </motion.div>
+                </Motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </Motion.div>
 
           {/* Dot — white mix-blend; outer handles hover scale, inner handles pulse */}
-          <motion.div
+          <Motion.div
             aria-hidden
             className="absolute mix-blend-difference flex items-center justify-center overflow-visible"
             style={{
@@ -561,7 +523,7 @@ const CustomCursor = () => {
             transition={{ type: 'spring', stiffness: 700, damping: 30 }}
           >
             {/* Inner pulse element — idleDotScale only lives here in style */}
-            <motion.div
+            <Motion.div
               className="absolute inset-0 rounded-full"
               style={{
                 scale: idleDotScale,         // ← MotionValue, no conflict (separate element)
@@ -572,7 +534,7 @@ const CustomCursor = () => {
 
             <AnimatePresence>
               {hovering && (
-                <motion.div
+                <Motion.div
                   initial={{ opacity: 0, scale: 0.5, x: 10, rotate: 0 }}
                   animate={{ opacity: 1, scale: 1, x: 0, rotate: 35 }}
                   exit={{ opacity: 0, scale: 0.5, x: -10, rotate: 0 }}
@@ -580,12 +542,12 @@ const CustomCursor = () => {
                   className="text-white relative z-10"
                 >
                   <ArrowLeft size={6} strokeWidth={2.5} />
-                </motion.div>
+                </Motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </Motion.div>
 
-        </motion.div>
+        </Motion.div>
       </div>
 
     </div>
