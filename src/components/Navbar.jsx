@@ -15,12 +15,14 @@ const Navbar = () => {
 
     // ── Detect theme of the section currently behind the navbar ────────────
     const detectTheme = useCallback(() => {
-        // Temporarily hide the navbar so elementFromPoint hits the section behind it
-        if (navRef.current) navRef.current.style.pointerEvents = 'none';
+        // Hide all z-100 overlays so elementFromPoint hits the actual section.
+        // pointer-events:none does NOT affect elementFromPoint — only visibility does.
+        const overlays = [navRef.current, document.querySelector('.progress-bar')].filter(Boolean);
+        overlays.forEach(o => { o.style.visibility = 'hidden'; });
 
         const el = document.elementFromPoint(window.innerWidth / 2, NAVBAR_SAMPLE_Y);
 
-        if (navRef.current) navRef.current.style.pointerEvents = '';
+        overlays.forEach(o => { o.style.visibility = ''; });
 
         if (!el) return;
 
@@ -68,9 +70,23 @@ const Navbar = () => {
     const scrollTo = (id) => {
         setIsMobileMenuOpen(false);
         const element = document.getElementById(id);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
-        }
+        if (!element) return;
+
+        // Temporarily remove sticky from ALL stacked sections so we can
+        // measure the true document-flow offset, then restore them.
+        const sections = document.querySelectorAll('[data-theme]');
+        const originals = [];
+        sections.forEach(s => {
+            originals.push(s.style.position);
+            s.style.position = 'relative';
+        });
+
+        const rect = element.getBoundingClientRect();
+        const top = rect.top + window.scrollY;
+
+        sections.forEach((s, i) => { s.style.position = originals[i]; });
+
+        window.scrollTo({ top, behavior: 'smooth' });
     };
 
     const visibilityClass = isVisible ? 'translate-y-0' : '-translate-y-full';
