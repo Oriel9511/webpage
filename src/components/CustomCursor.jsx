@@ -109,6 +109,7 @@ const IDLE_SEQUENCES = [
 ];
 
 const IDLE_DELAY_MS = 2500;
+const HOVER_OUT_DELAY_MS = 600; // 600ms delay to prevent flickering between links
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const CustomCursor = () => {
@@ -120,6 +121,7 @@ const CustomCursor = () => {
   const [isIdle, setIsIdle] = useState(false);
   const visibleRef = useRef(false);
   const hoveringRef = useRef(false);
+  const hoverOutTimerRef = useRef(null);
   const latestPointerRef = useRef({ x: -100, y: -100, active: false });
   const moveFrameRef = useRef(null);
 
@@ -233,13 +235,35 @@ const CustomCursor = () => {
   const syncTargetState = useCallback((target) => {
     const inTextInput = isTextInput(target);
     if (inTextInput) {
+      if (hoverOutTimerRef.current) {
+        clearTimeout(hoverOutTimerRef.current);
+        hoverOutTimerRef.current = null;
+      }
       setCursorHovering(false);
       setCursorVisible(false);
       return;
     }
 
     setCursorVisible(true);
-    setCursorHovering(isInteractive(target));
+    const interactive = isInteractive(target);
+
+    if (interactive) {
+      if (hoverOutTimerRef.current) {
+        clearTimeout(hoverOutTimerRef.current);
+        hoverOutTimerRef.current = null;
+      }
+      setCursorHovering(true);
+    } else {
+      // If we are currently hovering, wait before turning off the hover state
+      if (hoveringRef.current && !hoverOutTimerRef.current) {
+        hoverOutTimerRef.current = window.setTimeout(() => {
+          setCursorHovering(false);
+          hoverOutTimerRef.current = null;
+        }, HOVER_OUT_DELAY_MS);
+      } else if (!hoveringRef.current) {
+        setCursorHovering(false);
+      }
+    }
   }, [setCursorHovering, setCursorVisible]);
 
   const refreshTargetFromPointer = useCallback(() => {
@@ -309,6 +333,7 @@ const CustomCursor = () => {
 
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (hoverOutTimerRef.current) clearTimeout(hoverOutTimerRef.current);
       if (moveFrameRef.current !== null) cancelAnimationFrame(moveFrameRef.current);
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerdown', handleDown);
