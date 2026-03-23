@@ -96,7 +96,7 @@ async function animGlance(pupilX, pupilY) {
 
 const IDLE_SEQUENCES = [
   animLookAround,
-  animPulse,
+  // animPulse,
   animImpatience,
   animGlance,
   animDoubleBlink,
@@ -161,6 +161,22 @@ const CustomCursor = () => {
   const isIdleRef = useRef(false);
   const isRunningRef = useRef(false);
 
+  // ── Shuffle bag: random order, no repeats until all have played ──────────
+  const shuffleBagRef = useRef([]);
+
+  const nextFromBag = useCallback(() => {
+    // Refill & shuffle (Fisher-Yates) when bag is empty
+    if (shuffleBagRef.current.length === 0) {
+      const indices = IDLE_SEQUENCES.map((_, i) => i);
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+      shuffleBagRef.current = indices;
+    }
+    return IDLE_SEQUENCES[shuffleBagRef.current.shift()];
+  }, []);
+
   const resetIdle = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     if (isIdleRef.current) {
@@ -217,7 +233,7 @@ const CustomCursor = () => {
     };
   }, [enabled, x, y, resetIdle]);
 
-  // ── Idle animation loop ───────────────────────────────────────────────────
+  // ── Idle animation loop (shuffle bag — no repeats within a cycle) ─────────
   useEffect(() => {
     if (!isIdle || hovering) return;
 
@@ -228,7 +244,7 @@ const CustomCursor = () => {
       isRunningRef.current = true;
 
       while (!cancelled && isIdleRef.current && !hovering) {
-        const seq = IDLE_SEQUENCES[Math.floor(Math.random() * IDLE_SEQUENCES.length)];
+        const seq = nextFromBag();
         try {
           await seq(pupilX, pupilY, idleScaleY, idleDotScale);
         } catch (_) { /* animation was cancelled */ }
@@ -244,7 +260,7 @@ const CustomCursor = () => {
       // start a fresh loop without being blocked by a stale true value.
       isRunningRef.current = false;
     };
-  }, [isIdle, hovering, pupilX, pupilY, idleScaleY, idleDotScale]);
+  }, [isIdle, hovering, pupilX, pupilY, idleScaleY, idleDotScale, nextFromBag]);
 
   // ── Visual constants ──────────────────────────────────────────────────────
   const BASE_RING = 28;
