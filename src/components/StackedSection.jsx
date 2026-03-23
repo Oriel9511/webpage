@@ -35,6 +35,7 @@ const StackedSection = ({ children, className = "", id = "", zIndex = 0, theme =
         <section
             ref={ref}
             id={id}
+            data-theme={theme}
             className={`${positionClass} min-h-screen w-full flex flex-col justify-center overflow-hidden ${bgColor} ${className} ${shadowClass}`}
             style={{
                 zIndex,

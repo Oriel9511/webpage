@@ -2,71 +2,68 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 
+const NAVBAR_SAMPLE_Y = 64;
+
 
 const Navbar = () => {
-    const [activeSection, setActiveSection] = useState('hero');
+    const [isDarkBg, setIsDarkBg] = useState(true);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isVisible, setIsVisible] = useState(true);
     const lastScrollY = useRef(0);
     const rafId = useRef(null);
+    const navRef = useRef(null);
 
-    // ── Navbar show/hide with rAF throttle ──────────────────────────────────
+    // ── Detect theme of the section currently behind the navbar ────────────
+    const detectTheme = useCallback(() => {
+        // Temporarily hide the navbar so elementFromPoint hits the section behind it
+        if (navRef.current) navRef.current.style.pointerEvents = 'none';
+
+        const el = document.elementFromPoint(window.innerWidth / 2, NAVBAR_SAMPLE_Y);
+
+        if (navRef.current) navRef.current.style.pointerEvents = '';
+
+        if (!el) return;
+
+        // Walk up to find the nearest section with data-theme
+        const section = el.closest('[data-theme]');
+        if (section) {
+            setIsDarkBg(section.dataset.theme === 'dark');
+        }
+    }, []);
+
+    // ── Scroll handler: navbar show/hide + theme detection ──────────────────
     const handleScroll = useCallback(() => {
         if (rafId.current) return;
         rafId.current = requestAnimationFrame(() => {
             const currentScrollY = window.scrollY;
+
+            // Navbar visibility
             if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
                 setIsVisible(false);
             } else {
                 setIsVisible(true);
             }
             lastScrollY.current = currentScrollY;
+
+            // Theme detection at navbar position
+            detectTheme();
+
             rafId.current = null;
         });
-    }, []);
+    }, [detectTheme]);
 
     useEffect(() => {
+        // Run once on mount to set the initial theme
+        detectTheme();
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => {
             window.removeEventListener('scroll', handleScroll);
             if (rafId.current) cancelAnimationFrame(rafId.current);
         };
-    }, [handleScroll]);
+    }, [handleScroll, detectTheme]);
 
-    // ── Section detection via IntersectionObserver ───────────────────────────
-    useEffect(() => {
-        const sections = ['hero', 'quote1', 'work', 'quote2', 'opensource', 'about', 'contact'];
-        const sectionElements = sections
-            .map((id) => document.getElementById(id))
-            .filter(Boolean);
-
-        if (sectionElements.length === 0) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                // Find the most visible section that's intersecting
-                let best = null;
-                for (const entry of entries) {
-                    if (entry.isIntersecting) {
-                        if (!best || entry.intersectionRatio > best.intersectionRatio) {
-                            best = entry;
-                        }
-                    }
-                }
-                if (best) {
-                    setActiveSection(best.target.id);
-                }
-            },
-            { threshold: [0.1, 0.3, 0.5, 0.7], rootMargin: '-20% 0px -20% 0px' }
-        );
-
-        sectionElements.forEach((el) => observer.observe(el));
-        return () => observer.disconnect();
-    }, []);
-
-    const isDarkBg = ['hero', 'work', 'opensource', 'contact'].includes(activeSection);
     const textColor = isDarkBg ? 'text-white' : 'text-black';
-    const logoColor = isDarkBg ? 'text-white' : 'text-black';
+    const logoColor = textColor;
 
     const scrollTo = (id) => {
         setIsMobileMenuOpen(false);
@@ -81,6 +78,7 @@ const Navbar = () => {
     return (
         <>
             <nav
+                ref={navRef}
                 className={`fixed top-0 left-0 w-full z-[100] px-6 py-6 md:py-8 flex justify-between items-center transition-all duration-500 ease-in-out ${visibilityClass} pointer-events-none`}
             >
                 <motion.button
